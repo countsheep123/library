@@ -1,0 +1,45 @@
+version: "3"
+services:
+  oauth2proxy:
+    image: "quay.io/pusher/oauth2_proxy:v3.2.0-amd64"
+    ports:
+    - "8081:4180"
+    command: [
+      "--provider=azure",
+      "--cookie-secure=false",
+      "--upstream=http://library:8082",
+      "--http-address=0.0.0.0:4180",
+      "--redirect-url=http://localhost:8081/oauth2/callback",
+      "--email-domain=*",
+      "--azure-tenant={{TENANT_ID}}"
+    ]
+    environment:
+      OAUTH2_PROXY_COOKIE_SECRET: totally-secret-key
+      OAUTH2_PROXY_COOKIE_DOMAIN: localhost
+      OAUTH2_PROXY_CLIENT_ID: "{{CLIENT_ID}}"
+      OAUTH2_PROXY_CLIENT_SECRET: "{{CLIENT_SECRET}}"
+  library:
+    build: .
+    environment:
+    - "LISTEN_ADDR=0.0.0.0:8082"
+    - "STATIC_PATH=/static"
+    - "PG_READ_DB=postgres://user:pass@postgres:5432/library_db?sslmode=disable"
+    - "PG_WRITE_DB=postgres://user:pass@postgres:5432/library_db?sslmode=disable"
+    depends_on:
+      - "migrate"
+  postgres:
+    image: postgres:11.2-alpine
+    environment:
+    - "POSTGRES_USER=user"
+    - "POSTGRES_PASSWORD=pass"
+    - "POSTGRES_DB=library_db"
+  migrate:
+    build: .
+    command:
+    - "migrate"
+    - "-path=/opt/migration/"
+    - "-database=postgres://user:pass@postgres:5432/library_db?sslmode=disable"
+    - "up"
+    depends_on:
+      - "postgres"
+    restart: "no"
